@@ -605,6 +605,38 @@ void execSimpleCmd(SimpleCmd *cmd){
                      命令执行接口
 ********************************************************/
 void execute(){
-    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-    execSimpleCmd(cmd);
+    char simpleInputBuff[10][100],inputBuff[100],fileName[100];
+    int i,prei=-1,t=0;
+    for(i=0;i<strlen(inputBuff);i++)
+        if(inputBuff[i]=='|')
+        {
+            strncpy(simpleInputBuff[t],inputBuff+prei+1,i-prei-1);
+            simpleInputBuff[t][i-prei-1]='\0';
+            t++;
+            prei=i;
+        }
+    strncpy(simpleInputBuff[t],inputBuff+prei+1,i-prei-1);
+    simpleInputBuff[t][i-prei-1]='\0';
+    if(t>0)
+         for(i=0;i<=t;i++)
+            {
+                if(i<t)
+				{
+	             sprintf(fileName,"%s%d%s"," > tempfile",i,".txt");
+     	             strcat(simpleInputBuff[i],fileName);
+				}
+       	        if(i>0)
+				{
+	             sprintf(fileName,"%s%d%s"," < tempfile",i-1,".txt");
+     	             strcat(simpleInputBuff[i],fileName);
+				}
+     	        strcpy(inputBuff,simpleInputBuff[i]);
+                SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+                execSimpleCmd(cmd);
+        }
+    else
+    {
+        SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+        execSimpleCmd(cmd);
+    }
 }
