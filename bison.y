@@ -1,28 +1,4 @@
-%{
-    #include "global.h"
 
-    int yylex ();
-    void yyerror ();
-      
-    int offset, len, commandDone;
-%}
-
-%token STRING
-
-%%
-line            :   /* empty */
-                    |command                        {   execute();  commandDone = 1;   }
-;
-
-command         :   fgCommand
-                    |fgCommand '&'
-;
-
-fgCommand       :   simpleCmd
-;
-
-simpleCmd       :   progInvocation inputRedirect outputRedirect
-;
 
 progInvocation  :   STRING args
 ;
@@ -44,7 +20,7 @@ args            :   /* empty */
 /****************************************************************
                   词法分析函数
 ****************************************************************/
-int yylex(){
+/*int yylex(){
     //这个函数用来检查inputBuff是否满足lex的定义，实际上并不进行任何操作，初期可略过不看
     int flag;
     char c;
@@ -82,7 +58,7 @@ int yylex(){
         return 0;
     }
 }
-
+*/
 /****************************************************************
                   错误信息执行函数
 ****************************************************************/
@@ -112,7 +88,7 @@ int main(int argc, char** argv) {
 
         len = i;
         offset = 0;
-        
+        yy_scan_string(inputBuff);
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息
