@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <sys/termios.h>
 
+#include <dirent.h>  
 #include "global.h"
 #define DEBUG
 int goon = 0, ingnore = 0;       //用于设置signal信号量
@@ -324,10 +325,90 @@ void init(){
 /*******************************************************
                       命令解析
 ********************************************************/
+//获取当前目录下所有文件的文件名
+char ** dirGetInfo(const char *pathname)  
+{  
+   char ** filenames;  
+   DIR * dir;  
+   struct dirent * ent;  
+   int n = 0;  
+   filenames = (char **)malloc(sizeof(char*));  
+   filenames[0]=NULL;  
+   dir = opendir(pathname);  
+   if (!dir) return filenames;  
+   while ((ent = readdir(dir))) {  
+     filenames = (char**)realloc(filenames,sizeof(char*)*(n+1));  
+     filenames[n] = strdup(ent->d_name);  
+     n++;  
+   }  
+
+   closedir(dir);  
+   filenames = (char **)realloc(filenames,sizeof(char*)*(n+1));  
+   filenames[n] = NULL;  
+   return filenames;  
+}
+//通配符匹配函数
+int MatchWithAsteriskW(char* str1, char* pattern)
+{
+  if (str1 == NULL) return 0;
+  if (pattern == NULL) return 0;
+  int len1 = strlen(str1);
+  int len2 = strlen(pattern);
+  int mark = 0;//\D3\C3\D3ڷֶα\EA\BC\C7,'*'\B7ָ\F4\B5\C4\D7ַ\FB\B4\AE
+  int p1 = 0, p2 = 0;
+  
+  while (p1<len1 && p2<len2)
+  {
+    if (pattern[p2] == '?')
+    {
+      p1++;
+      p2++;
+      continue;
+    }
+    if (pattern[p2] == '*')
+    {
+      p2++;
+      mark = p2;
+      continue;
+    }
+    if (str1[p1] != pattern[p2])
+    {
+      if (p1 == 0 && p2 == 0)
+      {
+        return 0;
+      }
+      p1 -= p2 - mark - 1;
+      p2 = mark;
+      continue;
+    }
+    p1++;
+    p2++;
+  }
+  if (p2 == len2)
+  {
+    if (p1 == len1)
+    {
+      return 1;
+    }
+    if (pattern[p2 - 1] == '*')
+    {
+      return 1;
+    }
+  }
+  while (p2<len2)
+  {
+    if (pattern[p2] != '*')
+      return 0;
+    p2++;
+  }
+  return 1;
+}
+//主体
+void execSimpleCmd(SimpleCmd *cmd);
 SimpleCmd* handleSimpleCmdStr(int begin, int end){
-    int i, j, k;
+    int i, j, k,flag1=0,n,i2;
     int fileFinished; //记录命令是否解析完毕
-    char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
+    char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL,**filenames;
     SimpleCmd *cmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
     
 	//默认为非后台命令，输入输出重定向为null
@@ -363,7 +444,8 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
                     temp = buff[k];
                 }
                 break;
-
+			case'*':flag1++;
+			case'?':flag1++;
             case '<': //输入重定向标志
                 if(j != 0){
 		    //此判断为防止命令直接挨着<符号导致判断为同一个参数，如果ls<sth
@@ -424,40 +506,80 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
             k++;
         }
     }
-    
-	//依次为命令名及其各个参数赋值
-    cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
-    cmd->args[k] = NULL;
-    for(i = 0; i<k; i++){
-        j = strlen(buff[i]);
-        cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
-        strcpy(cmd->args[i], buff[i]);
-    }
-    
-	//如果有输入重定向文件，则为命令的输入重定向变量赋值
-    if(strlen(inputFile) != 0){
-        j = strlen(inputFile);
-        cmd->input = (char*)malloc(sizeof(char) * (j + 1));
-        strcpy(cmd->input, inputFile);
-    }
-
-    //如果有输出重定向文件，则为命令的输出重定向变量赋值
-    if(strlen(outputFile) != 0){
-        j = strlen(outputFile);
-        cmd->output = (char*)malloc(sizeof(char) * (j + 1));   
-        strcpy(cmd->output, outputFile);
-    }
-    #ifdef DEBUG
-    printf("****\n");
-    printf("isBack: %d\n",cmd->isBack);
+    //如果存在通配符
+	if(flag1>0)
+	{
+		filenames=dirGetInfo((char*)get_current_dir_name());
+		for(i2=0;filenames[i2]!=NULL;i2++)
+		{
+			if(MatchWithAsteriskW(filenames[i2], buff[1]))
+			{
+				cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
+				cmd->args[k] = NULL;
+				j = strlen(buff[0]);
+				cmd->args[0] = (char*)malloc(sizeof(char) * (j + 1));   
+				strcpy(cmd->args[0], buff[0]);
+				j = strlen(filenames[i2]);
+				cmd->args[1] = (char*)malloc(sizeof(char) * (j + 1));   
+				strcpy(cmd->args[1], filenames[i2]);
+				for(i = 2; i<k; i++){
+					j = strlen(buff[i]);
+					cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
+					strcpy(cmd->args[i], buff[i]);
+				}
+		#ifdef DEBUG
+	    printf("****\n");
+		printf("isBack: %d\n",cmd->isBack);
     	for(i = 0; cmd->args[i] != NULL; i++){
     		printf("args[%d]: %s\n",i,cmd->args[i]);
+		}
+		printf("input: %s\n",cmd->input);
+		printf("output: %s\n",cmd->output);
+		printf("****\n");
+		#endif 
+				printf("coanima");
+				execOuterCmd(cmd);
+			}
+		}
+		return NULL;
 	}
-    printf("input: %s\n",cmd->input);
-    printf("output: %s\n",cmd->output);
-    printf("****\n");
-    #endif
+	else
+	{
+	
+		//依次为命令名及其各个参数赋值
+		cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
+		cmd->args[k] = NULL;
+		for(i = 0; i<k; i++){
+		 j = strlen(buff[i]);
+		 cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
+		 strcpy(cmd->args[i], buff[i]);
+		}
+    
+		//如果有输入重定向文件，则为命令的输入重定向变量赋值
+		if(strlen(inputFile) != 0){
+			j = strlen(inputFile);
+		    cmd->input = (char*)malloc(sizeof(char) * (j + 1));
+			strcpy(cmd->input, inputFile);
+	    }
+	
+	 //如果有输出重定向文件，则为命令的输出重定向变量赋值
+	 if(strlen(outputFile) != 0){
+		    j = strlen(outputFile);
+			cmd->output = (char*)malloc(sizeof(char) * (j + 1));   
+			strcpy(cmd->output, outputFile);
+	    }
+#ifdef DEBUG
+	    printf("****\n");
+		printf("isBack: %d\n",cmd->isBack);
+    	for(i = 0; cmd->args[i] != NULL; i++){
+    		printf("args[%d]: %s\n",i,cmd->args[i]);
+		}
+		printf("input: %s\n",cmd->input);
+		printf("output: %s\n",cmd->output);
+		printf("****\n");
+#endif
     return cmd;
+}
 }
 
 /*******************************************************
@@ -596,8 +718,8 @@ void execSimpleCmd(SimpleCmd *cmd){
     //释放结构体空间
     for(i = 0; cmd->args[i] != NULL; i++){
         free(cmd->args[i]);
-     //   free(cmd->input);
-     //   free(cmd->output);
+        free(cmd->input);
+        free(cmd->output);
     }
 }
 
@@ -632,11 +754,13 @@ void execute(){
 				}
      	        strcpy(inputBuff,simpleInputBuff[i]);
                 SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-                execSimpleCmd(cmd);
+        	if(cmd!=NULL)
+			execSimpleCmd(cmd);
         }
     else
     {
         SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-        execSimpleCmd(cmd);
+	if(cmd!=NULL)
+		execSimpleCmd(cmd);
     }
 }
