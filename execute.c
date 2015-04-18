@@ -596,8 +596,8 @@ void execSimpleCmd(SimpleCmd *cmd){
     //释放结构体空间
     for(i = 0; cmd->args[i] != NULL; i++){
         free(cmd->args[i]);
-        free(cmd->input);
-        free(cmd->output);
+     //   free(cmd->input);
+     //   free(cmd->output);
     }
 }
 
@@ -605,7 +605,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                      命令执行接口
 ********************************************************/
 void execute(){
-    char simpleInputBuff[10][100],inputBuff[100],fileName[100];
+    char simpleInputBuff[10][100],fileName[100];
     int i,prei=-1,t=0;
     for(i=0;i<strlen(inputBuff);i++)
         if(inputBuff[i]=='|')
