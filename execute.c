@@ -1,5 +1,5 @@
 
-********************************************************/
+/********************************************************/
 /*判断命令是否存在*/
 int exists(char *cmdFile){
     int i = 0;
@@ -732,8 +732,8 @@ void execSimpleCmd(SimpleCmd *cmd){
     //释放结构体空间
     for(i = 0; cmd->args[i] != NULL; i++){
         free(cmd->args[i]);
-        free(cmd->input);
-        free(cmd->output);
+        //free(cmd->input);
+        //free(cmd->output);
     }
 }
 
