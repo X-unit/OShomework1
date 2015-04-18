@@ -1,4 +1,33 @@
+%{
+    #include "global.h"
 
+    int yylex ();
+    void yyerror ();
+      
+    int offset, len, commandDone;
+%}
+
+%token STRING
+
+%%
+line            :   /* empty */
+                    |command                        {   execute();  commandDone = 1;   }
+;
+
+command         :   fgCommand
+                    |fgCommand '&'
+;
+
+fgCommand       :   simpleCmd
+                    |pipeCmd
+;
+
+pipeCmd         :   simpleCmd '|' simpleCmd
+                    |simpleCmd '|' pipeCmd
+;                    
+
+simpleCmd       :   progInvocation inputRedirect outputRedirect
+;
 
 progInvocation  :   STRING args
 ;
@@ -16,6 +45,7 @@ args            :   /* empty */
 ;
 
 %%
+
 
 /****************************************************************
                   词法分析函数
