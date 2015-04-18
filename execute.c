@@ -1,28 +1,4 @@
-#include <string.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <math.h>
-#include <errno.h>
-#include <signal.h>
-#include <stddef.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <sys/ioctl.h>
-#include <sys/termios.h>
 
-#include <dirent.h>  
-#include "global.h"
-#define DEBUG
-int goon = 0, ingnore = 0;       //用于设置signal信号量
-char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
-History history;                 //历史命令
-Job *head = NULL;                //作业头指针
-pid_t fgPid;                     //当前前台作业的进程号
-
-/*******************************************************
-                  工具以及辅助方法
 ********************************************************/
 /*判断命令是否存在*/
 int exists(char *cmdFile){
@@ -185,6 +161,42 @@ void ctrl_Z(){
     fgPid = 0;
 }
 
+void ctrl_C(){
+    Job *now = NULL;
+    Job *last = NULL;
+    if(fgPid == 0){ //前台没有作业则直接返回
+        return;
+    }
+    
+    //SIGCHLD信号产生自ctrl+c
+    ingnore = 1;
+
+    now = head;
+    while(now != NULL && now->pid != fgPid)
+    {
+        last=now;
+        now = now->next;
+    }
+    
+    if(now == NULL){ //未找到前台作业，则根据fgPid添加前台作业
+        now = addJob(fgPid);
+    }
+    //修改前台作业的状态及相应的命令格式，并打印提示信息
+    strcpy(now->state, DONE); 
+    now->cmd[strlen(now->cmd)] = '&';
+    now->cmd[strlen(now->cmd) + 1] = '\0';
+    printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+    //remove 
+    //开始移除该作业
+    if(now == head){
+        head = now->next;
+    }else{
+        last->next = now->next;
+    }
+    kill(fgPid,SIGKILL);
+    free(now);
+    fgPid=0;
+}
 /*fg命令*/
 void fg_exec(int pid){    
     Job *now = NULL; 
@@ -208,6 +220,7 @@ void fg_exec(int pid){
     strcpy(now->state, RUNNING);
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
+  signal(SIGINT, ctrl_C);
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
@@ -320,6 +333,7 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
+    signal(SIGINT, ctrl_C);
 }
 
 /*******************************************************
