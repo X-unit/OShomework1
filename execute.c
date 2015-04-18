@@ -1,4 +1,27 @@
+#include <string.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <math.h>
+#include <errno.h>
+#include <signal.h>
+#include <stddef.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/ioctl.h>
+#include <sys/termios.h>
 
+#include "global.h"
+#define DEBUG
+int goon = 0, ingnore = 0;       //用于设置signal信号量
+char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
+History history;                 //历史命令
+Job *head = NULL;                //作业头指针
+pid_t fgPid;                     //当前前台作业的进程号
+
+/*******************************************************
+-                  工具以及辅助方法
 /********************************************************/
 /*判断命令是否存在*/
 int exists(char *cmdFile){
